@@ -1,132 +1,168 @@
-import math
 import copy
+import math
+import sys
+import matplotlib.pyplot as plt
+import time
+
+class KNN:
+
+    def computeValueOfDist(self,distance, inpData, currDataPt, remainderFeatures, i, j):
+
+        distance = distance + pow((inpData[i][remainderFeatures[j]] - inpData[currDataPt][remainderFeatures[j]]),
+                                        2)
+        distance = math.sqrt(distance)
+
+        return distance
+
+    def nearestNeigborClassifier(self,inputData, dataPoint, remainderFeatures, instanceCount):
+        nearestNeighbor = 0
+        smallestDistance = float(sys.maxsize)
+
+        for i in range(instanceCount):
+            if dataPoint == i:
+                pass
+            else:
+                distance = 0
+                for j in range(len(remainderFeatures)):
+                    distance = self.computeValueOfDist(distance, inputData, dataPoint, remainderFeatures, i, j)
+
+                if distance < smallestDistance:
+                    nearestNeighbor = i
+                    smallestDistance = distance
+
+        return nearestNeighbor
+
+    def accuracyCalculation(self,inputData, remainderFeatures, instanceCount):
+        value = 0
+        for i in range(instanceCount):
+            currOO = i
+            neighbor = self.nearestNeigborClassifier(inputData, currOO, remainderFeatures, instanceCount)
+
+            if inputData[neighbor][0] == inputData[currOO][0]:
+                value = value + 1
+
+        accuracy = (value / instanceCount) * 100
+
+        return accuracy
 
 
-def NNClassifier(inpData, currDataPt, remainderFeatures, instanceCount):
-    nNeigh = 0
-    distSmallest = float('inf')
-
-    for i in range(instanceCount):
-        if currDataPt == i:
-            pass
-        else:
-            ValueOfDist = 0
-            for j in range(len(remainderFeatures)):
-                ValueOfDist = ValueOfDist + pow((inpData[i][remainderFeatures[j]] - inpData[currDataPt][remainderFeatures[j]]), 2)
-
-            ValueOfDist = math.sqrt(ValueOfDist)
-
-            if ValueOfDist < distSmallest:
-                nNeigh = i
-                distSmallest = ValueOfDist
-
-    return nNeigh
-
-
-def accuracyOneOut(inpData, remainderFeatures, instanceCount):
-    correct = 0.0
-
-    for i in range(instanceCount):
-        currOO = i
-        neighbor = NNClassifier(inpData, currOO, remainderFeatures, instanceCount)
-
-        if inpData[neighbor][0] == inpData[currOO][0]:
-            correct = correct + 1
-
-    accuracy = (correct / instanceCount) * 100
-
-    return accuracy
-
-
-def forwardSelection(inpData, instanceCount, featureCount):
-    remainderFeatures = []
+def forwardSelection(inputData, instanceCount, featureCount):
+    startTime=time.time();
+    featuresArray = []
     fnlFeatures = []
-    topAccuracy = 0.0
-
+    maxAccuracy = 0
+    results = {}
     for i in range(featureCount):
-        add_this = -1
-        local_add = -1
-        localAccuracy = 0.0
+        appendValue = -1
+        currentAdd = -1
+        currentAccuracy = 0
+        #newly added
+        knn=KNN()
         for j in range(1, featureCount + 1):
-            if j not in remainderFeatures:
-                temp_subset = copy.deepcopy(remainderFeatures)
-                temp_subset.append(j)
+            if j not in featuresArray:
+                temp = copy.deepcopy(featuresArray) # to keep appending the features add them to a temp array first
+                temp.append(j) # add the feature if not present in the temp.
+                accuracy = knn.accuracyCalculation(inputData, temp, instanceCount) # calculate the accuracy now for the temp array
+                print('\tFor the feature(s) ', temp, ' accuracy is ', accuracy, '%')
+                if accuracy > maxAccuracy: # compare with the latest accuracy value
+                    maxAccuracy = accuracy
+                    appendValue = j
+                if accuracy > currentAccuracy:
+                    currentAccuracy = accuracy
+                    currentAdd = j
 
-                accuracy = accuracyOneOut(inpData, temp_subset, instanceCount)
-                print('\tFor the feature(s) ', temp_subset, ' accuracy is ', accuracy, '%')
-                if accuracy > topAccuracy:
-                    topAccuracy = accuracy
-                    add_this = j
-                if accuracy > localAccuracy:
-                    localAccuracy = accuracy
-                    local_add = j
-        if add_this >= 0:
-            remainderFeatures.append(add_this)
-            fnlFeatures.append(add_this)
-            print('\n\nFeature set ', remainderFeatures, ' was best, accuracy is ', topAccuracy, '%\n\n')
+        if appendValue >= 0:
+            featuresArray.append(appendValue)
+            fnlFeatures.append(appendValue)
+            print('\n\nFeature set ', featuresArray, ' was best, accuracy is ', maxAccuracy, '%\n\n')
+            results[str(featuresArray)] = maxAccuracy
         else:
-            remainderFeatures.append(local_add)
-            print('Feature set ', remainderFeatures, ' was best, accuracy is ', localAccuracy, '%\n\n')
+            featuresArray.append(currentAdd)
+            print('Feature set ', featuresArray, ' was best, accuracy is ', currentAccuracy, '%\n\n')
+            results[str(featuresArray)] = maxAccuracy
 
-    print('Search Completed!! The best feature subset is', fnlFeatures, ' with an accuracy of : ', topAccuracy, '%')
 
+    print('Search Completed!! The best feature subset is', fnlFeatures, ' with an accuracy of : ', maxAccuracy, '%')
+    endTime = time.time()
+    print('Time taken for execution', round(endTime-startTime,2))
+    barGraph(results)
 
-def backwardElimination(inpData, instanceCount, featureCount, topAcc):
-    remainderFeatures = [i + 1 for i in range(featureCount)]
-    fnlFeatures = [i + 1 for i in range(featureCount)]
-    topAccuracy = topAcc
+def backwardElimination(inputData, instanceCount, featureCount, predictedAccuracy):
+    startTime=time.time();
+    results={}
+    featuresArray = [i + 1 for i in range(featureCount)] # consider all features in this array
+    result = [i + 1 for i in range(featureCount)]# consider all features in this array
+    maxAccuracy = predictedAccuracy # Accuracy with all features
+    knn=KNN()
     for i in range(featureCount):
-        remove_this = -1
-        local_remove = -1
-        localAccuracy = 0.0
+        valueToRemove = -1
+        currentValueRemove = -1
+        currentAccuracy = 0
         for j in range(1, featureCount + 1):
 
-            if j in remainderFeatures:
-                temp_subset = copy.deepcopy(remainderFeatures)
-
-                temp_subset.remove(j)
-
-                accuracy = accuracyOneOut(inpData, temp_subset, instanceCount)
-                print('\tUsing feature(s) ', temp_subset, ' accuracy is ', accuracy, '%')
-                if accuracy > topAccuracy:
-                    topAccuracy = accuracy
-                    remove_this = j
-                if accuracy > localAccuracy:
-                    localAccuracy = accuracy
-                    local_remove = j
-        if remove_this >= 0:
-            remainderFeatures.remove(remove_this)
-            fnlFeatures.remove(remove_this)
-            print('\n\nFeature set ', remainderFeatures, ' was best, accuracy is ', topAccuracy, '%\n\n')
+            if j in featuresArray:
+                temp = copy.deepcopy(featuresArray) #Copy the array of all features initially
+                temp.remove(j) # remove one feature
+                accuracy = knn.accuracyCalculation(inputData, temp, instanceCount) # calculate accuracy
+                print('\tUsing feature(s) ', temp, ' accuracy is ', accuracy, '%')
+                if accuracy > maxAccuracy:
+                    maxAccuracy = accuracy
+                    valueToRemove = j
+                if accuracy > currentAccuracy:
+                    currentAccuracy = accuracy
+                    currentValueRemove = j
+        if valueToRemove >= 0:
+            featuresArray.remove(valueToRemove) # remove value if the feature reduces the accuracy or has no impact
+            result.remove(valueToRemove)
+            results[str(featuresArray)] = maxAccuracy
+            print('\n\nFeature set ', featuresArray, ' was best, accuracy is ', maxAccuracy, '%\n\n')
         else:
-            print('\n\n(Warning, Accuracy has decreased! Continuing search in case of local maxima)')
-            remainderFeatures.remove(local_remove)
-            print('Feature set ', remainderFeatures, ' was best, accuracy is ', localAccuracy, '%\n\n')
+            featuresArray.remove(currentValueRemove)
+            results[str(featuresArray)] = maxAccuracy
+            print('Feature set ', featuresArray, ' was best, accuracy is ', currentAccuracy, '%\n\n')
+    endTime = time.time()
 
-    print('The best Feature Subset is ', fnlFeatures, ' with an accuracy of', topAccuracy, '%')
+    print('Time taken for execution', round(endTime - startTime, 2))
+    print('The best Feature Subset is ', result, ' with an accuracy of', maxAccuracy, '%')
+    barGraph(results)
 
+
+def barGraph(finalResults):
+    # creating the dataset
+
+        features = list(finalResults.keys())
+        accuracy = list(finalResults.values())
+
+        fig = plt.figure(figsize = (10, 5))
+     # creating the bar plot
+        plt.bar(features, accuracy, color ='grey',width=0.3)
+        plt.xlabel("Features ")
+        plt.ylabel("Accuracy")
+        plt.title("feature sets vs accuracy")
+        plt.xticks(rotation=15)
+        plt.show()
 
 
 def main():
     #file = input('Name of File to Test ? ')
 
     try:
-        inpData = open("CS205_SP_2022_SMALLtestdata__48.txt", 'r')
+        inputData = open("CS205_SP_2022_Largetestdata__38.txt", 'r')
     except:
         raise IOError('' + "file" + ' Was not found. Ending Program')
 
-    inputLnOne = inpData.readline()
+    inputLnOne = inputData.readline()
 
     featureCount = len(inputLnOne.split()) - 1
 
-    inpData.seek(0)
-    instanceCount = sum(1 for line in inpData)
+    inputData.seek(0)
+    instanceCount = sum(1 for line in inputData)
 
-    inpData.seek(0)
+    inputData.seek(0)
 
     dataInst = [[] for i in range(instanceCount)]
     for i in range(instanceCount):
-        dataInst[i] = [float(j) for j in inpData.readline().split()]
+        dataInst[i] = [float(j) for j in inputData.readline().split()]
 
     print
     'Select The Algorithm from the option below:'
@@ -146,8 +182,8 @@ def main():
     ftrList = []
     for i in range(1, featureCount + 1):
         ftrList.append(i)
-
-    accuracy = accuracyOneOut(dataInst, ftrList, instanceCount)
+    knn = KNN()
+    accuracy = knn.accuracyCalculation(dataInst, ftrList, instanceCount)
     if userAlgoSelected == 1:
         forwardSelection(dataInst, instanceCount, featureCount)
     elif userAlgoSelected == 2:
